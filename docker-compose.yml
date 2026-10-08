@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  app:
+    build: .
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Запуск тестов: docker compose --profile test run --rm tests
+  tests:
+    build: .
+    profiles: ["test"]
+    env_file: .env
+    environment:
+      POSTGRES_DB: wallet_test
+    command: ["pytest", "-v"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
